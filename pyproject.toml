@@ -1,27 +1,32 @@
 [project]
-name = "nonebot_plugin_BitTorrents"
+name = "nonebot-plugin-bittorrents"
 version = "1.1.0"
 description = "适配NoneBot的磁力搜索插件，通过机器人帮你寻找电影、软件或者学习资料"
 authors = [
     {name = "NightDust981989"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/NightDust981989/nonebot-plugin-BitTorrents"
-repository = "https://github.com/NightDust981989/nonebot-plugin-BitTorrents"
-
 dependencies = [
     "httpx",
     "beautifulsoup4",
     "lxml",
-    "pydantic"
+    "pydantic",
+    "pydantic-settings",
+    "nonebot2",
+    "nonebot-adapter-onebot"
 ]
 
+[project.urls]
+homepage = "https://github.com/NightDust981989/nonebot-plugin-BitTorrents"
+repository = "https://github.com/NightDust981989/nonebot-plugin-BitTorrents"
+
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=61.0","wheel"]
 build-backend = "setuptools.build_meta"
 
-
+[tool.setuptools.packages.find]
+include = ["nonebot_plugin_BitTorrents*"]
 
 [tool.nonebot]
-plugins = ["nonebot_plugin_BitTorrents"]
+plugins = ["nonebot_plugin_BitTorrents"] 

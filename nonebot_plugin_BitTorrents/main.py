@@ -9,7 +9,11 @@ from bs4 import BeautifulSoup
 from nonebot import on_command
 from nonebot.adapters import Message
 from nonebot.params import CommandArg
-from nonebot.adapters.onebot.v11 import MessageSegment
+
+try:
+    from pydantic import BaseSettings
+except ImportError:
+    from pydantic_settings import BaseSettings
 
 # ========== 1. 配置映射类（从配置文件读取参数） ==========
 @dataclass
@@ -188,7 +192,7 @@ class MagnetSearchService:
                     if detail_encrypt:
                         detail_html = MagnetUtils.decrypt_base64(detail_encrypt.group(1))
 
-                    # 提取磁力链接
+                    # 提取磁力链接 - 保持原始逻辑，使用全局soup对象
                     magnet_link = None
                     magnet_a = soup.find("a", href=re.compile(r"magnet:\?xt=urn:btih:"))
                     if magnet_a:
@@ -220,7 +224,6 @@ class MagnetSearchService:
 # ========== 4. 初始化配置和服务 ==========
 # 从 nonebot 配置中获取参数，如果不存在则使用默认值
 from nonebot import get_driver
-from pydantic import BaseSettings
 
 class Config(BaseSettings):
     magnet_base_url: str = "https://clg2.clgapp1.xyz"
@@ -229,7 +232,7 @@ class Config(BaseSettings):
     magnet_request_timeout: int = 15
 
     class Config:
-        extra = "ignore"
+        extra = "allow"
 
 driver = get_driver()
 global_config = driver.config
