@@ -11,9 +11,11 @@ from nonebot.adapters import Message
 from nonebot.params import CommandArg
 
 try:
-    from pydantic import BaseSettings
+    from pydantic import BaseModel
+    from nonebot import get_plugin_config
 except ImportError:
-    from pydantic_settings import BaseSettings
+    from pydantic import BaseSettings as BaseModel
+    from nonebot import get_driver
 
 # ========== 1. 配置映射类（从配置文件读取参数） ==========
 @dataclass
@@ -91,26 +93,34 @@ class MagnetSearchService:
         self.client: httpx.AsyncClient = None
 
     async def _init_client(self):
-        """初始化客户端：使用配置文件的超时时间"""
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "Origin": self.config.base_url,
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": self.config.base_url
-        }
+        """初始化客户端"""
+        if self.client is None:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh;q=0.9",
+                "Origin": self.config.base_url,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": self.config.base_url
+            }
 
-        self.client = httpx.AsyncClient(
-            headers=headers,
-            cookies=self.config.captcha_cookies,
-            timeout=self.config.request_timeout,  # 从配置读取超时时间
-            follow_redirects=False,              # 关闭自动重定向
-            verify=False
-        )
+            self.client = httpx.AsyncClient(
+                headers=headers,
+                cookies=self.config.captcha_cookies,
+                timeout=self.config.request_timeout,  # 从配置读取超时时间
+                follow_redirects=False,              # 关闭自动重定向
+                verify=False
+            )
+
+    async def close_client(self):
+        """关闭客户端"""
+        if self.client:
+            await self.client.aclose()
+            self.client = None
 
     async def search(self, keyword: str, sort_param: str = "") -> List[str]:
         """搜索逻辑：使用配置文件的站点/接口/结果数"""
+        # 确保客户端已初始化
         await self._init_client()
         results = []
 
@@ -215,28 +225,24 @@ class MagnetSearchService:
         except Exception as e:
             print(f"搜索异常：{str(e)}")
             results = [f"搜索失败：{str(e)[:50]}"]
-        finally:
-            if self.client:
-                await self.client.aclose()
 
         return results
 
-# ========== 4. 初始化配置和服务 ==========
-# 从 nonebot 配置中获取参数，如果不存在则使用默认值
-from nonebot import get_driver
-
-class Config(BaseSettings):
+# ========== 4. 配置类定义 ==========
+class Config(BaseModel):
     magnet_base_url: str = "https://clg2.clgapp1.xyz"
     magnet_search_path: str = "/cllj.php"
     magnet_max_results: int = 3
     magnet_request_timeout: int = 15
 
-    class Config:
-        extra = "allow"
-
-driver = get_driver()
-global_config = driver.config
-plugin_config = Config(**global_config.dict())
+try:
+    plugin_config = get_plugin_config(Config)
+except:
+    # 兜底
+    from nonebot import get_driver
+    driver = get_driver()
+    global_config = driver.config
+    plugin_config = Config(**global_config.dict())
 
 # 初始化配置类
 magnet_config = MagnetConfig(

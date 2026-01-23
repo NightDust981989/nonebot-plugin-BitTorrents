@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-bittorrents"
-version = "1.1.0"
+version = "1.1.1"
 description = "适配NoneBot的磁力搜索插件，通过机器人帮你寻找电影、软件或者学习资料"
 authors = [
     {name = "NightDust981989"}
@@ -8,13 +8,11 @@ authors = [
 license = "MIT"
 readme = "README.md"
 dependencies = [
-    "httpx",
-    "beautifulsoup4",
-    "lxml",
-    "pydantic",
-    "pydantic-settings",
-    "nonebot2",
-    "nonebot-adapter-onebot"
+    "httpx>=0.23.0",
+    "beautifulsoup4>=4.11.0",
+    "lxml>=4.9.0",
+    "nonebot2>=2.3.0",
+    "nonebot-adapter-onebot",
 ]
 
 [project.urls]

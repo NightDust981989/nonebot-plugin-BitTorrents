@@ -8,6 +8,7 @@ __plugin_meta__ = PluginMetadata(
     type="application",
     homepage="https://github.com/NightDust981989/nonebot-plugin-BitTorrents",
     config=Config,
+    supported_adapters=None,
 )
 
 from . import main
