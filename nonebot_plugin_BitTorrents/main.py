@@ -21,7 +21,7 @@ except ImportError:
 @dataclass
 class MagnetConfig:
     """磁力搜索配置类"""
-    base_url: str = "https://clg2.clgapp1.xyz"         # 站点基础地址
+    base_url: str = "https://clg8.clgapp4.xyz"         # 站点基础地址
     search_path: str = "/cllj.php"                     # 搜索接口路径
     max_results: int = 3                               # 最大返回结果数
     request_timeout: int = 15                          # 请求超时时间（秒）
@@ -30,8 +30,7 @@ class MagnetConfig:
     def __post_init__(self):
         # 初始化固定验证Cookie
         self.captcha_cookies = {
-            "sssfwz2": "qwsdsddsdsdse",
-            "aywcUid": "lwgkvwDiYQ_20211009155217"
+            "sssfwz": "qwsdsddsdsdse"
         }
         # 处理base_url结尾的/（统一格式：不带结尾/）
         if self.base_url.endswith("/"):
@@ -96,11 +95,10 @@ class MagnetSearchService:
         """初始化客户端"""
         if self.client is None:
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "User-Agent": "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Droid Build/FRG22D) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "zh-CN,zh;q=0.9",
                 "Origin": self.config.base_url,
-                "Content-Type": "application/x-www-form-urlencoded",
                 "Referer": self.config.base_url
             }
 
@@ -138,43 +136,43 @@ class MagnetSearchService:
             
             # 提取原始响应
             raw_html = response.text
-
-            # ========== 解密原始响应 ==========
-            encrypt_match = re.search(r"window\.atob\('([^']+)'", raw_html)
-            if not encrypt_match:
-                print(f"未找到window.atob加密串")
-                return []
-            
-            decrypted_html = MagnetUtils.decrypt_base64(encrypt_match.group(1))
-
+            decrypted_html = raw_html
 
             # ========== 提取xq.php链接（使用配置） ==========
             soup = BeautifulSoup(decrypted_html, "lxml")
             result_container = soup.find("ul", id="Search_list_wrapper")
             if not result_container:
-                print(f"解密后仍无搜索结果容器")
+                print(f"无搜索结果容器")
                 return []
 
             detail_links = []
             processed_urls = set()
             # 遍历结果：最多取配置的max_results条
             for idx, li in enumerate(result_container.find_all("li")):
-                if idx >= self.config.max_results:  # 从配置读取最大结果数
+                if idx >= self.config.max_results:
                     break
                 if li.find("ul", class_="pagination"):
                     continue
 
-                link_tag = li.find("a", href=re.compile(r"xq\.php\?key="))
-                if not link_tag:
+                form_tag = li.find("form", action=re.compile(r"xq\.php"))
+                if not form_tag:
+                    continue
+                key_input = form_tag.find("input", attrs={"name": "key"})
+                if not key_input:
+                    continue
+                key = key_input.get("value", "").strip()
+                if not key:
                     continue
 
-                full_url = MagnetUtils.get_full_url(self.config.base_url, link_tag.get("href"))
-                if full_url in processed_urls:
+                full_url = MagnetUtils.get_full_url(self.config.base_url, "/xq.php")
+                
+                # key去重
+                if key in processed_urls:
                     continue
-                processed_urls.add(full_url)
+                processed_urls.add(key)
 
                 # 提取基础信息
-                title = link_tag.text.strip() or f"搜索结果{idx+1}"
+                title = form_tag.text.strip() or f"搜索结果{idx+1}"
                 size = re.search(r"文件大小：([0-9.]+ [GMK]B)", li.text)
                 size = size.group(1).strip() if size else "未知大小"
                 create_time = re.search(r"创建时间：(\d{4}-\d{2}-\d{2})", li.text)
@@ -182,6 +180,7 @@ class MagnetSearchService:
 
                 detail_links.append({
                     "url": full_url,
+                    "key": key,
                     "title": title,
                     "size": size,
                     "create_time": create_time
@@ -193,18 +192,17 @@ class MagnetSearchService:
             # ========== 解析详情页 ==========
             for link in detail_links:
                 try:
-                    detail_resp = await self.client.get(link["url"], follow_redirects=False)
-                    detail_raw = detail_resp.text
+                    # 改为POST
+                    detail_resp = await self.client.post(
+                        link["url"],
+                        data={"key": link["key"]}
+                    )
+                    detail_html = detail_resp.text
 
-                    # 解密详情页
-                    detail_encrypt = re.search(r"window\.atob\('([^']+)'", detail_raw)
-                    detail_html = detail_raw
-                    if detail_encrypt:
-                        detail_html = MagnetUtils.decrypt_base64(detail_encrypt.group(1))
-
-                    # 提取磁力链接 - 保持原始逻辑，使用全局soup对象
+                    # 提取磁力链接
+                    detail_soup = BeautifulSoup(detail_html, "lxml")
                     magnet_link = None
-                    magnet_a = soup.find("a", href=re.compile(r"magnet:\?xt=urn:btih:"))
+                    magnet_a = detail_soup.find("a", href=re.compile(r"magnet:\?xt=urn:btih:"))
                     if magnet_a:
                         magnet_link = magnet_a.get("href").strip()
                     if not magnet_link:
@@ -230,7 +228,7 @@ class MagnetSearchService:
 
 # ========== 4. 配置类定义 ==========
 class Config(BaseModel):
-    magnet_base_url: str = "https://clg2.clgapp1.xyz"
+    magnet_base_url: str = "https://clg8.clgapp4.xyz"
     magnet_search_path: str = "/cllj.php"
     magnet_max_results: int = 3
     magnet_request_timeout: int = 15
@@ -285,7 +283,7 @@ async def handle_bt_command(args: Message = CommandArg()):
 
     if not results:
         # 无结果
-        await bt_cmd.finish("未找到相关磁力链接")
+        await bt_cmd.finish("未找到相关磁力链接，网站失效或网络问题")
     else:
         # 有结果时拼接完整内容
         result_text = f"共找到 {len(results)} 条有效结果：\n"
